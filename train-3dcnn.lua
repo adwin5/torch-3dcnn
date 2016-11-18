@@ -101,7 +101,7 @@ step = function(batch_size)
     local count = 0
     local shuffle = torch.randperm(trainset.size)
     batch_size = batch_size or 200
-    
+    --prepare input output    
     for t = 1, trainset.size, batch_size do
         -- setup inputs and targets for this mini-batch
         local size = math.min(t + batch_size - 1, trainset.size) - t

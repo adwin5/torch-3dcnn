@@ -15,11 +15,11 @@ local model = t.model --expect input batch x nPlane x time x w x h
 
 gpus = torch.range(1, cutorch.getDeviceCount()):totable()
 dpt = nn.DataParallelTable(1):add(model, gpus):cuda()
- 
+x, dl_dx =dpt:getParameters()
+
 input = torch.round(torch.CudaTensor(1, 3, 75, 50, 100):uniform(0, 255))
 output = dpt:forward(input)
 fakeGradients = output:clone():uniform(-0.1, 0.1)
 dpt:backward(input, fakeGradients)
---x, dl_dx =dpt:getParameters()
 print(dpt)
 print(x)

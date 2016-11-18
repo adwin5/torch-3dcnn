@@ -2,6 +2,7 @@
 require 'cunn'
 require 'cutorch'
 require 'cudnn'
+require 'rnn'
 
 -- input size is batchSize x nPlane x time x w x h, 50 x 3 x 75 x 50 x 100
 function deep_model_4d(time)
@@ -13,35 +14,41 @@ function deep_model_4d(time)
  cnn:add(nn.ReLU()) 
  cnn:add(nn.VolumetricMaxPooling(1,2,2,1,2,2)) 
  cnn:add(nn.VolumetricDropout(0.2))
+ --print("cnn done")
 
- -- second convolution, non-linear, and pooling
+ --first convolution, non-linear, and pooling
  cnn:add(nn.VolumetricConvolution(32,64,3,5,5,1,1,1,1,2,2)) 
  cnn:add(nn.ReLU()) 
  cnn:add(nn.VolumetricMaxPooling(1,2,2,1,2,2)) 
  cnn:add(nn.VolumetricDropout(0.2))
+ --print("cnn second done")
 
- -- third convolution, non-linear, and pooling
- cnn:add(nn.VolumetricConvolution(64,96,3,3,3,1,1,1,1,1,1))
- cnn:add(nn.ReLU())
- cnn:add(nn.VolumetricMaxPooling(1,2,2,1,2,2))
- cnn:add(nn.VolumetricDropout(0.2))
-
- -- Bi LSTM
- -- hfiddenSize=128
- -- lstmp = nn.SeqLSTMP(96*3*6, hiddensize, 256)
- -- cnn:add(lstmp)
-
- -- linear
- cnn:add(nn.Reshape(time*96*3*6))
- cnn:add(nn.Linear(time*96*3*6, time*128))
+ --first convolution, non-linear, and pooling
+ cnn:add(nn.VolumetricConvolution(64,96,3,5,5,1,1,1,1,2,2)) 
  cnn:add(nn.ReLU()) 
- cnn:add(nn.Linear(time*128, time*28))
- cnn:add(nn.ReLU())--code for mnist case 
- cnn:add(nn.Linear(time*28, 10))--code for mnist case
- cnn:add(nn.LogSoftMax())
+ cnn:add(nn.VolumetricMaxPooling(1,2,2,1,2,2)) 
+ cnn:add(nn.VolumetricDropout(0.2))
+ --print("cnn third done")
+ 
+ --Expects an input shape of seqlen x batchsize x inputsize
+ cnn:add(nn.Transpose(2,3))-- from batch x channel x len x width x height > batch x len x channel x width x height
+ cnn:add(nn.View(-1):setNumInputDims(3))
+ brnn = nn.SeqBRNN(96*3*6, 256)
+ cnn:add(brnn)
+ --[[-- linear
+ cnn:add(nn.Reshape(time*96*3*6))
+ cnn:add(nn.Linear(time*96*3*6, 128))
+ cnn:add(nn.ReLU())
+ print("first linear done")
+ ]]
 
- --convert to cudnn
- --cudnn.convert(cnn, cudnn)
+ --cnn:add(nn.Linear(time*128, time*28))
+ --print("second linear")
+ --cnn:add(nn.ReLU())--code for mnist case 
+ cnn:add(nn.Linear(256, 10))--code for mnist case
+ cnn:add(nn.LogSoftMax())
+ print("done linear whole")
+
  return cnn:cuda()
 end
 
@@ -66,8 +73,10 @@ sgd_params = {
 --]]
 time=75
 model=deep_model_4d(time)
+print("model loaded")
 ---[[
 x, dl_dx = model:getParameters()
+print("get parameter")
 local input = torch.CudaTensor(1,3,time,50,100)
 --local y=model:forward(input)
 --print(y:size())
@@ -79,7 +88,7 @@ targets[1] = target
 targets:add(1)
 print(targets)
 --print(#model:parameters()[1])
-print(x:size(1))
+print("number of parameer: " .. x:size(1))
 local feval = function(x_new)
     -- reset data
     if x ~= x_new then x:copy(x_new) end
