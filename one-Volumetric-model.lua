@@ -31,23 +31,19 @@ function deep_model_4d(time)
  --print("cnn third done")
  
  --Expects an input shape of seqlen x batchsize x inputsize
- cnn:add(nn.Transpose(2,3))-- from batch x channel x len x width x height > batch x len x channel x width x height
- cnn:add(nn.View(-1):setNumInputDims(3))
+ cnn:add(nn.Transpose({2,3}))-- from batch x channel x len x width x height > batch x len x channel x width x height
+ cnn:add(nn.View(1,time,96*3*6):setNumInputDims(5))
  brnn = nn.SeqBRNN(96*3*6, 256)
  cnn:add(brnn)
- --[[-- linear
- cnn:add(nn.Reshape(time*96*3*6))
- cnn:add(nn.Linear(time*96*3*6, 128))
- cnn:add(nn.ReLU())
- print("first linear done")
- ]]
 
- --cnn:add(nn.Linear(time*128, time*28))
- --print("second linear")
- --cnn:add(nn.ReLU())--code for mnist case 
- cnn:add(nn.Linear(256, 10))--code for mnist case
+ --TODO upsampling
+
+ --Linear
+ cnn:add(nn.Reshape(1*time*256))
+ cnn:add(nn.Linear(time*256, time*128))
+ cnn:add(nn.ReLU())
+ cnn:add(nn.Linear(time*128, 10)) --mock for mnist case
  cnn:add(nn.LogSoftMax())
- print("done linear whole")
 
  return cnn:cuda()
 end
@@ -86,7 +82,7 @@ target = trainset.label[1]
 targets = torch.CudaTensor(1)
 targets[1] = target
 targets:add(1)
-print(targets)
+print(model)
 --print(#model:parameters()[1])
 print("number of parameer: " .. x:size(1))
 local feval = function(x_new)
