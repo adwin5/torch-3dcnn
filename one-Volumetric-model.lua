@@ -30,10 +30,10 @@ function deep_model_4d(time)
  cnn:add(nn.VolumetricDropout(0.2))
  --print("cnn third done")
  
- --Expects an input shape of seqlen x batchsize x inputsize
+ --Expects an input shape of batchsize x seqLen x inputsize By setting [batchFirst] to true
  cnn:add(nn.Transpose({2,3}))-- from batch x channel x len x width x height > batch x len x channel x width x height
- cnn:add(nn.View(1,time,96*3*6):setNumInputDims(5))
- brnn = nn.SeqBRNN(96*3*6, 256)
+ cnn:add(nn.View(1,time,96*3*6):setNumInputDims(5))--from batch x len x channel x width x height > batch x len x (channel x width x height)
+ brnn = nn.SeqBRNN(96*3*6, 256, true)
  cnn:add(brnn)
 
  --TODO upsampling
