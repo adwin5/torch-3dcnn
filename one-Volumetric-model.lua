@@ -78,8 +78,9 @@ print("number of parameer: " .. x:size(1))
 step=function()
     local input = torch.CudaTensor(1,3,time,50,100)
     local inputs=input:clone()
-    
-    local target = trainset.label[1]
+
+    local shuffle = torch.randperm(trainset.size)    
+    local target = trainset.label[shuffle[1]]
     local targets = torch.CudaTensor(1)
     targets[1] = target
     targets:add(1)
@@ -96,10 +97,11 @@ step=function()
         return loss, dl_dx
     end
     _, fs = optim.sgd(feval, x, sgd_params)
-    return fs
+    return fs[1]
 end
-fs=step(a)
-print(fs)
+loss=step()
+i=1
+print(string.format('Epoch: %d Current loss: %4f', i, loss))
 
 -- return package:
 return {
