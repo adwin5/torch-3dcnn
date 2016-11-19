@@ -70,38 +70,36 @@ sgd_params = {
 time=75
 model=deep_model_4d(time)
 print("model loaded")
----[[
-x, dl_dx = model:getParameters()
-print("get parameter")
-local input = torch.CudaTensor(1,3,time,50,100)
---local y=model:forward(input)
---print(y:size())
-local inputs=input:clone()
-
-target = trainset.label[1]
-targets = torch.CudaTensor(1)
-targets[1] = target
-targets:add(1)
 print(model)
 --print(#model:parameters()[1])
+x, dl_dx = model:getParameters()
 print("number of parameer: " .. x:size(1))
-local feval = function(x_new)
-    -- reset data
-    if x ~= x_new then x:copy(x_new) end
-    dl_dx:zero()
 
-    -- perform mini-batch gradient descent
-    local loss = criterion:forward(model:forward(inputs), targets)
-    local tmp_diff = criterion:backward(model.output, targets)
-    model:backward(inputs, tmp_diff)
-    print(model.output:size())
-    return loss, dl_dx
+step=function()
+    local input = torch.CudaTensor(1,3,time,50,100)
+    local inputs=input:clone()
+    
+    local target = trainset.label[1]
+    local targets = torch.CudaTensor(1)
+    targets[1] = target
+    targets:add(1)
+    local feval = function(x_new)
+        -- reset data
+        if x ~= x_new then x:copy(x_new) end
+        dl_dx:zero()
+    
+        -- perform mini-batch gradient descent
+        local loss = criterion:forward(model:forward(inputs), targets)
+        local tmp_diff = criterion:backward(model.output, targets)
+        model:backward(inputs, tmp_diff)
+        print(model.output:size())
+        return loss, dl_dx
+    end
+    _, fs = optim.sgd(feval, x, sgd_params)
+    return fs
 end
-_, fs = optim.sgd(feval, x, sgd_params)
+fs=step(a)
 print(fs)
---x, dl_dx = model:getParameters()
---print(model)
---]]
 
 -- return package:
 return {
