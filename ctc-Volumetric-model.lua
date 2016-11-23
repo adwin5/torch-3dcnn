@@ -3,7 +3,8 @@ require 'cunn'
 require 'cutorch'
 require 'cudnn'
 require 'rnn'
-
+require 'warp_ctc'
+require 'nnx'
 -- input size is batchSize x nPlane x time x w x h, 50 x 3 x 75 x 50 x 100
 function deep_model_4d(time)
  local cnn = nn.Sequential();
@@ -42,24 +43,21 @@ function deep_model_4d(time)
  cnn:add(nn.Reshape(1*time*256))
  cnn:add(nn.Linear(time*256, time*128))
  cnn:add(nn.ReLU())
- cnn:add(nn.Linear(time*128, 10)) --mock for mnist case
- cnn:add(nn.LogSoftMax())
+ cnn:add(nn.Linear(time*128, time*28)) --mock for mnist case
+ cnn:add(nn.Reshape(time,28))
+ -- cnn:add(nn.Squeeze())
+ -- cnn:add(nn.LogSoftMax())
 
- return cnn:cuda()
+ return cnn
 end
 
 --test file
 ---[[
 --nPlane x time x w x h
-mnist = require 'mnist'
-require 'optim'
-fullset = mnist.traindataset()
-trainset = {
-    size = 3,
-    label = fullset.label[{{1,500}}]
-}
 
-criterion = nn.ClassNLLCriterion():cuda()
+
+--criterion = nn.ClassNLLCriterion():cuda()
+ctcCriterion = nn.CTCCriterion()
 sgd_params = {
    learningRate = 1e-2,
    learningRateDecay = 1e-4,
@@ -76,29 +74,35 @@ x, dl_dx = model:getParameters()
 print("number of parameer: " .. x:size(1))
 
 step=function()
-    local input = torch.CudaTensor(1,3,time,50,100)
-    local inputs=input:clone()
+    local input = torch.Tensor(1,3,time,50,100)
+    local inputs=input
 
     local shuffle = torch.randperm(trainset.size)    
-    local target = trainset.label[shuffle[1]]
-    local targets = torch.CudaTensor(1)
-    targets[1] = target
-    targets:add(1)
+    --local target = trainset.label[shuffle[1]]
+    --local targets = torch.Tensor(1)
+    --targets[1] = target
+    --targets:add(1)
+
     local feval = function(x_new)
         -- reset data
         if x ~= x_new then x:copy(x_new) end
         dl_dx:zero()
     
         -- perform mini-batch gradient descent
-        local loss = criterion:forward(model:forward(inputs), targets)
-        local tmp_diff = criterion:backward(model.output, targets)
-        model:backward(inputs, tmp_diff)
-        print(model.output:size())
+        -- local loss = criterion:forward(model:forward(inputs), targets)
+        local labels = {{1,4,23,10,11,11,12,25}}
+        local sizes = torch.Tensor({10})
+	output=model:forward(inputs)
+	local loss=ctcCriterion:forward(output, labels, sizes)
+        --local tmp_diff = criterion:backward(model.output, targets)
+        local tmp_diff = ctcCriterion:backward(output, labels)
+        model:backward(inputs, tmp_diff:double())
         return loss, dl_dx
     end
     _, fs = optim.sgd(feval, x, sgd_params)
     return fs[1]
 end
+
 loss=step()
 i=1
 print(string.format('Epoch: %d Current loss: %4f', i, loss))
@@ -121,7 +125,7 @@ eval = function(dataset, batch_size)
     return count / dataset.size
 end
 
-max_iters = 3
+max_iters = 20
 do
     local last_accuracy = 0
     local decreasing = 0
