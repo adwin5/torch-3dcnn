@@ -5,6 +5,7 @@ require 'cudnn'
 require 'rnn'
 require 'warp_ctc'
 require 'nnx'
+require 'optim'
 -- input size is batchSize x nPlane x time x w x h, 50 x 3 x 75 x 50 x 100
 function deep_model_4d(time)
  local cnn = nn.Sequential();
@@ -77,7 +78,7 @@ step=function()
     local input = torch.Tensor(1,3,time,50,100)
     local inputs=input
 
-    local shuffle = torch.randperm(trainset.size)    
+    --local shuffle = torch.randperm(trainset.size)    
     --local target = trainset.label[shuffle[1]]
     --local targets = torch.Tensor(1)
     --targets[1] = target
